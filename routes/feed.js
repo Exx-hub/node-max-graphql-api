@@ -2,14 +2,16 @@ const express = require("express");
 
 const feedController = require("../controllers/feed");
 
-const { check, body } = require("express-validator");
+const { body } = require("express-validator");
+const verifyToken = require("../middleware/verifyToken");
 
 const router = express.Router();
 
-router.get("/posts", feedController.getPosts);
+router.get("/posts", verifyToken, feedController.getPosts);
 
 router.post(
   "/post",
+  verifyToken,
   [
     body("title").trim().isLength({ min: 5 }),
     body("content").trim().isLength({ min: 5, max: 400 }),
@@ -17,10 +19,11 @@ router.post(
   feedController.createPost
 );
 
-router.get("/post/:postId", feedController.getPostById);
+router.get("/post/:postId", verifyToken, feedController.getPostById);
 
 router.put(
   "/post/:postId",
+  verifyToken,
   [
     body("title").trim().isLength({ min: 5 }),
     body("content").trim().isLength({ min: 5, max: 400 }),
@@ -28,6 +31,6 @@ router.put(
   feedController.updatePost
 );
 
-router.delete("/post/:postId", feedController.deletePost);
+router.delete("/post/:postId", verifyToken, feedController.deletePost);
 
 module.exports = router;

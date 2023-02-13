@@ -7,6 +7,8 @@ const mongoose = require("mongoose");
 const multer = require("multer");
 
 const feedRoutes = require("./routes/feed");
+const authRoutes = require("./routes/auth");
+const userRoutes = require("./routes/user");
 
 const app = express();
 const PORT = process.env.PORT;
@@ -52,6 +54,8 @@ app.use((req, res, next) => {
 });
 
 app.use("/feed", feedRoutes);
+app.use("/auth", authRoutes);
+app.use("/user", userRoutes);
 
 // express error middleware, gets call if next is passed with an error object
 // general error handling function

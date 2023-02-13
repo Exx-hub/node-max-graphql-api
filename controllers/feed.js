@@ -3,6 +3,7 @@ const path = require("path");
 const { validationResult } = require("express-validator");
 
 const Post = require("../models/Post");
+const User = require("../models/User");
 
 const getPosts = async (req, res, next) => {
   const currentPage = req.query.page || 1;
@@ -67,6 +68,7 @@ const createPost = async (req, res, next) => {
     return next(error);
   }
 
+  const user = req.user;
   const { title, content } = req.body;
   const image = req.file; // req.file accessible after multer middleware setup
 
@@ -80,17 +82,22 @@ const createPost = async (req, res, next) => {
     title,
     content,
     imageUrl: image.path,
-    creator: {
-      name: "Alvin Acosta",
-    },
+    creator: user.userId,
   });
 
   try {
     const result = await newPost.save();
 
+    const postCreator = await User.findById(user.userId);
+
+    postCreator.posts.push(newPost);
+
+    await postCreator.save();
+
     res.status(201).json({
       message: "Post Created successfully.",
       post: result,
+      creator: { _id: postCreator._id, name: postCreator.name },
     });
   } catch (err) {
     const error = new Error(err);
@@ -111,6 +118,7 @@ const updatePost = async (req, res, next) => {
     return next(error);
   }
 
+  const userId = req.user.userId;
   const { postId } = req.params;
   const updatedTitle = req.body.title;
   const updateContent = req.body.content;
@@ -127,6 +135,13 @@ const updatePost = async (req, res, next) => {
   }
 
   const postToEdit = await Post.findById(postId);
+
+  // only users who created specific post can edit them
+  if (postToEdit.creator.toString() !== userId.toString()) {
+    const error = new Error("Not Authorized.");
+    error.statusCode = 403;
+    return next(error);
+  }
 
   if (!postToEdit) {
     const error = new Error("Post not found.");
@@ -148,6 +163,7 @@ const updatePost = async (req, res, next) => {
 };
 
 const deletePost = async (req, res, next) => {
+  const userId = req.user.userId;
   const { postId } = req.params;
 
   try {
@@ -158,17 +174,25 @@ const deletePost = async (req, res, next) => {
       error.statusCode = 404;
       return next(error);
     }
-    //check if post created by logged in user.
+
+    // only users who created specific post can delete them
+    if (postToDelete.creator.toString() !== userId.toString()) {
+      const error = new Error("Not Authorized.");
+      error.statusCode = 403;
+      return next(error);
+    }
 
     const result = await Post.findByIdAndDelete(postToDelete._id);
 
+    // delete image of deleted post from file system
     clearImage(result.imageUrl);
 
-    if (!postToDelete) {
-      const error = new Error("Post not found.");
-      error.statusCode = 404;
-      return next(error);
-    }
+    // delete reference of deleted post from user posts array
+    const userToDeleteFrom = await User.findById(userId);
+
+    userToDeleteFrom.posts.pull(postId);
+
+    await userToDeleteFrom.save();
 
     res.status(200).json({ message: "Post deleted.", post: result });
   } catch (err) {

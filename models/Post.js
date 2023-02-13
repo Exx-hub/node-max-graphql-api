@@ -6,7 +6,9 @@ const postSchema = new Schema(
     imageUrl: { type: String, required: true },
     content: { type: String, required: true },
     creator: {
-      name: { type: String, required: true },
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
   },
   { timestamps: true }
