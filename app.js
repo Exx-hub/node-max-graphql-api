@@ -2,6 +2,20 @@ const path = require("path");
 require("dotenv").config();
 const express = require("express");
 
+const { createServer } = require("http");
+const app = express();
+const httpServer = createServer(app);
+
+const io = require("./socket").init(httpServer);
+
+// const io = new Server(httpServer, {
+//   cors: {
+//     origin: "*",
+//     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+//     allowedHeaders: ["Content-Type", "Authorization"],
+//   },
+// });
+
 const cors = require("cors");
 const mongoose = require("mongoose");
 const multer = require("multer");
@@ -10,7 +24,6 @@ const feedRoutes = require("./routes/feed");
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/user");
 
-const app = express();
 const PORT = process.env.PORT;
 
 const fileStorage = multer.diskStorage({
@@ -83,7 +96,9 @@ const db = mongoose.connection;
 
 db.once("open", () => {
   console.log("DB connection Established");
-  app.listen(PORT, () => console.log(`Server listening on port: ${PORT}`));
+  const server = httpServer.listen(PORT, () => console.log(`Server listening on port: ${PORT}`));
+
+  io.on("connection", (socket) => console.log("Client Connected"));
 });
 
 db.on("error", (err) => {

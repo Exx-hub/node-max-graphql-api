@@ -2,17 +2,20 @@ const fs = require("fs");
 const path = require("path");
 const { validationResult } = require("express-validator");
 
+const io = require("../socket");
+
 const Post = require("../models/Post");
 const User = require("../models/User");
 
 const getPosts = async (req, res, next) => {
   const currentPage = req.query.page || 1;
-  const perPage = 2;
+  const perPage = 4;
 
   try {
     const totalItems = await Post.find().countDocuments();
     const posts = await Post.find()
       .populate("creator")
+      .sort({ createdAt: -1 })
       .skip((currentPage - 1) * perPage)
       .limit(perPage);
 
@@ -95,6 +98,11 @@ const createPost = async (req, res, next) => {
 
     await postCreator.save();
 
+    io.getIO().emit("posts", {
+      action: "create",
+      post: { ...result._doc, creator: { _id: postCreator._id, name: postCreator.name } },
+    });
+
     res.status(201).json({
       message: "Post Created successfully.",
       post: result,
@@ -135,10 +143,10 @@ const updatePost = async (req, res, next) => {
     return next(error);
   }
 
-  const postToEdit = await Post.findById(postId);
+  const postToEdit = await Post.findById(postId).populate("creator");
 
   // only users who created specific post can edit them
-  if (postToEdit.creator.toString() !== userId.toString()) {
+  if (postToEdit.creator._id.toString() !== userId.toString()) {
     const error = new Error("Not Authorized.");
     error.statusCode = 403;
     return next(error);
@@ -159,6 +167,11 @@ const updatePost = async (req, res, next) => {
   postToEdit.imageUrl = imageUrl;
 
   const result = await postToEdit.save();
+
+  io.getIO().emit("posts", {
+    action: "update",
+    post: result,
+  });
 
   res.status(200).json({ message: "Post updated successfully", post: result });
 };
@@ -194,6 +207,11 @@ const deletePost = async (req, res, next) => {
     userToDeleteFrom.posts.pull(postId);
 
     await userToDeleteFrom.save();
+
+    io.getIO().emit("posts", {
+      action: "delete",
+      post: postId,
+    });
 
     res.status(200).json({ message: "Post deleted.", post: result });
   } catch (err) {
